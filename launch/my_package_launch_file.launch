@@ -1,0 +1,5 @@
+<launch>
+    <!-- My Package launch file -->
+    <node pkg="odom_tracking_pkg" type="egg" name="odom_tracking_pkg"  output="screen">
+    </node>
+</launch>
