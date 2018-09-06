@@ -10,7 +10,8 @@ project(odom_tracking_pkg)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
-)
+  tf2_ros
+  )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
