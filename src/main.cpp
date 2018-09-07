@@ -1,9 +1,12 @@
 #include <ros/ros.h>
 #include <string>
+#include <geometry_msgs/PointStamped.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float64.h>
+#include <std_msgs/Header.h>
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/Imu.h>
+#include <sensor_msgs/NavSatFix.h>
 #include <tf2_ros/transform_listener.h>
 
 
@@ -12,6 +15,33 @@ struct odom {
 };
 
 struct odom odom_data;
+
+void transformPoint(const tf2_ros::TransformListener& listener){
+    //we'll create a point in the base_laser frame that we'd like to transform to the base_link frame
+    geometry_msgs::PointStamped base_footprint;
+    base_footprint.header.frame_id = "base_footprint";
+
+    //we'll just use the most recent transform available for our simple example
+    base_footprint.header.stamp = ros::Time();
+
+    //just an arbitrary point in space
+    base_footprint.point.x = 0;
+    base_footprint.point.y = 0;
+    base_footprint.point.z = 0;
+
+    try{
+        geometry_msgs::PointStamped base_point;
+        listener.transformPoint("base_link", base_footprint, base_point);
+
+        ROS_INFO("base_footprint: (%.2f, %.2f. %.2f) -----> base_link: (%.2f, %.2f, %.2f) at time %.2f",
+            base_footprint.point.x, base_footprint.point.y, base_footprint.point.z,
+            base_point.point.x, base_point.point.y, base_point.point.z, base_point.header.stamp.toSec());
+    }
+    catch(tf2_ros::TransformException &ex){
+        ROS_ERROR("Received an exception trying to transform a point from \"base_footprint\" to \"base_link\": %s", ex.what());
+    }
+}
+
 
 void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Define a function called 'callback' that receives 
                                                                          // a parameter named 'msg' 
@@ -30,6 +60,11 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
 void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
     ROS_INFO("IMU subscribe");
 }
+
+void counterCallbackGPS(const sensor_msgs::NavSatFix::ConstPtr& msg) {
+    ROS_INFO("GPS subscribe");
+}
+
 
 
 int main(int argc, char** argv) {
@@ -55,13 +90,16 @@ int main(int argc, char** argv) {
         }
         tf2Received = 1;
     }
-
+    
+    transformPoint(tf2Listener);
+    
     ros::Subscriber sub_joint_states = nh.subscribe("/zio/joint_states", 1000, counterCallbackJoint);
     ros::Subscriber sub_imu = nh.subscribe("/vn100/imu", 1000, counterCallbackIMU);
-                                               // Create a Subscriber object that will listen 
-                                               // to the /counter topic and will call the 
-                                               // 'callback' function each time it reads 
-                                               // somethin from the topic
+    ros::Subscriber sub_gps = nh.subscribe("/ublox_gps/fix", 1000, counterCallbackGPS);
+    // Create a Subscriber object that will listen 
+    // to the /counter topic and will call the 
+    // 'callback' function each time it reads 
+    // somethin from the topic
    
     ros::Rate loop_rate(50); // Set a publish rate of 2 Hz
 
