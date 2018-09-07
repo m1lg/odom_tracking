@@ -25,16 +25,25 @@ struct dim {
 };
 
 
-struct odom {
-    double back_wheel_w;
+struct joint {
+    //time time1;
+    //time time2;
+    double back_wheel_old;
     double back_wheel_v;
     struct imu inital;
     struct imu current;
     bool init = 1;
 };
 
+struct odom {
+    
+    //time stamp;
 
-struct odom odom_data;
+
+};
+
+
+struct joint sensor_data;
 struct dim vehicle;
 
 void staticTransform(const tf2_ros::Buffer &buffer){
@@ -119,11 +128,10 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
     
     std::vector<std::string> names = msg->name;	
     if (msg->name[0][0] == 'f') {
-	
-        //ROS_INFO("%s", &names[0][0]);
-        odom_data.back_wheel_w = (msg->velocity[1]+msg->velocity[2])/2;
-        odom_data.back_wheel_v = odom_data.back_wheel_w*vehicle.wheel_r;
-		ROS_INFO("avg= %f",odom_data.back_wheel_v);         
+        double angular_v;
+        angular_v = (msg->velocity[1]+msg->velocity[2])/2;
+        sensor_data.back_wheel_v = angular_v*vehicle.wheel_r;	
+
 	} else {
 		
         //ROS_INFO("%s", &names[0][0]);
@@ -138,19 +146,18 @@ void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
     tf::quaternionMsgToTF(msg->orientation,q);  
     tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
 
-    if (odom_data.init) {
+    if (sensor_data.init) {
         
-        odom_data.inital.r = roll; 
-        odom_data.inital.p = pitch;
-        odom_data.inital.y = yaw;
-        odom.init = 0;
+        sensor_data.inital.r = roll; 
+        sensor_data.inital.p = pitch;
+        sensor_data.inital.y = yaw;
+        sensor_data.init = 0;
     } else {
         
-        odom_data.current.r = roll;
-        odom_data.current.p = pitch;
-        odom_data.current.y = yaw;
-    }
-    ROS_INFO("Yaw = %f", yaw);
+        sensor_data.current.r = roll;
+        sensor_data.current.p = pitch;
+        sensor_data.current.y = yaw;
+    } 
 }
 
 void counterCallbackGPS(const sensor_msgs::NavSatFix::ConstPtr& msg) {
