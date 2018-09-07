@@ -8,36 +8,41 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <tf2_ros/transform_listener.h>
-
+#include "tf2_ros/message_filter.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
 struct odom {
-    double back_wheel_vel;    
+    double back_wheel_w;
+    double back_wheel_v;
+    double back_wheel_r;
 };
 
 struct odom odom_data;
 
-void transformPoint(const tf2_ros::TransformListener& listener){
+
+void transformPoint(const tf2_ros::Buffer &buffer){
     //we'll create a point in the base_laser frame that we'd like to transform to the base_link frame
-    geometry_msgs::PointStamped base_footprint;
-    base_footprint.header.frame_id = "base_footprint";
+    geometry_msgs::PointStamped base_link;
+    base_link.header.frame_id = "base_footprint";
 
     //we'll just use the most recent transform available for our simple example
-    base_footprint.header.stamp = ros::Time();
+    base_link.header.stamp = ros::Time();
 
     //just an arbitrary point in space
-    base_footprint.point.x = 0;
-    base_footprint.point.y = 0;
-    base_footprint.point.z = 0;
+    base_link.point.x = 0;
+    base_link.point.y = 0;
+    base_link.point.z = 0;
 
     try{
-        geometry_msgs::PointStamped base_point;
-        listener.transformPoint("base_link", base_footprint, base_point);
+        geometry_msgs::PointStamped base_footprint;
+        buffer.transform(base_link, base_footprint, "base_link");
 
-        ROS_INFO("base_footprint: (%.2f, %.2f. %.2f) -----> base_link: (%.2f, %.2f, %.2f) at time %.2f",
-            base_footprint.point.x, base_footprint.point.y, base_footprint.point.z,
-            base_point.point.x, base_point.point.y, base_point.point.z, base_point.header.stamp.toSec());
+        ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> base_footprint: (%.4f, %.4f, %.4f) at time %.4f",
+            base_link.point.x, base_link.point.y, base_link.point.z,
+            base_footprint.point.x, base_footprint.point.y, base_footprint.point.z, base_footprint.header.stamp.toSec());
+            odom_data.back_wheel_r  = base_footprint.point.z;
     }
-    catch(tf2_ros::TransformException &ex){
+    catch(tf2::TransformException &ex){
         ROS_ERROR("Received an exception trying to transform a point from \"base_footprint\" to \"base_link\": %s", ex.what());
     }
 }
@@ -49,8 +54,8 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
 	if (msg->name[0][0] == 'f') {
 	
         ROS_INFO("%s", &names[0][0]);
-        odom_data.back_wheel_vel = (msg->velocity[1]+msg->velocity[2])/2;
-		ROS_INFO("avg= %f",odom_data.back_wheel_vel);
+        odom_data.back_wheel_v = (msg->velocity[1]+msg->velocity[2])/2;
+		ROS_INFO("avg= %f",odom_data.back_wheel_v);
 	} else {
 		
         ROS_INFO("%s", &names[0][0]);
@@ -66,16 +71,14 @@ void counterCallbackGPS(const sensor_msgs::NavSatFix::ConstPtr& msg) {
 }
 
 
-
 int main(int argc, char** argv) {
     	
 	bool tf2Received = 0;
     ros::init(argc, argv, "odom_tracking"); // Initiate a Node called 'odom_tracking'
-	ros::NodeHandle nh;
-    
+    ros::NodeHandle nh;
+
     tf2_ros::Buffer tf2Buffer;
     tf2_ros::TransformListener tf2Listener(tf2Buffer);
-    
     while(!tf2Received) {
 
         geometry_msgs::TransformStamped transformStamped;
@@ -91,7 +94,7 @@ int main(int argc, char** argv) {
         tf2Received = 1;
     }
     
-    transformPoint(tf2Listener);
+    transformPoint(tf2Buffer);
     
     ros::Subscriber sub_joint_states = nh.subscribe("/zio/joint_states", 1000, counterCallbackJoint);
     ros::Subscriber sub_imu = nh.subscribe("/vn100/imu", 1000, counterCallbackIMU);
@@ -105,6 +108,7 @@ int main(int argc, char** argv) {
 
     while (ros::ok()) {
     
+        //ROS_INFO("Wheel radius = %f", odom_data.back_wheel_r);
         ros::spinOnce();
         loop_rate.sleep(); // Make sure the publish rate maintains at 2 Hz
     }
