@@ -8,24 +8,44 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <tf2_ros/transform_listener.h>
-#include "tf2_ros/message_filter.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include <tf2_ros/message_filter.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf/tf.h>
+
+struct imu {
+    double r;
+    double p;
+    double y;
+};
+
+struct dim {
+  double wheel_r;
+  double wheel_base;
+  double wheel_track;
+};
+
 
 struct odom {
     double back_wheel_w;
     double back_wheel_v;
-    double back_wheel_r;
-    double wheelbase;
+    struct imu inital;
+    struct imu current;
+    bool init = 1;
 };
 
+
 struct odom odom_data;
+struct dim vehicle;
 
-
-void transformPoint(const tf2_ros::Buffer &buffer){
+void staticTransform(const tf2_ros::Buffer &buffer){
     //we'll create a point in the base_laser frame that we'd like to transform to the base_link frame
     geometry_msgs::PointStamped base_link;
-    base_link.header.frame_id = "base_link";
+    geometry_msgs::PointStamped base_footprint;
+    geometry_msgs::PointStamped rear_right_wheel_link;
+    geometry_msgs::PointStamped rear_left_wheel_link;
+    geometry_msgs::PointStamped right_steering_link;
 
+    base_link.header.frame_id = "base_link";
     //we'll just use the most recent transform available for our simple example
     base_link.header.stamp = ros::Time();
 
@@ -35,73 +55,74 @@ void transformPoint(const tf2_ros::Buffer &buffer){
     base_link.point.z = 0;
 
     try{
-        geometry_msgs::PointStamped base_footprint;
         base_footprint.header.frame_id = "base_footprint";
 
         buffer.transform(base_link, base_footprint, "base_footprint");
-
-        ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> base_footprint: (%.4f, %.4f, %.4f) at time %.4f",
-        base_link.point.x, base_link.point.y, base_link.point.z,
-        base_footprint.point.x, base_footprint.point.y, base_footprint.point.z, base_footprint.header.stamp.toSec());
-        odom_data.back_wheel_r  = base_footprint.point.z;
+        vehicle.wheel_r = base_footprint.point.z;
+        //ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> base_footprint: (%.4f, %.4f, %.4f) at time %.4f",
+        //        base_link.point.x, base_link.point.y, base_link.point.z,
+        //        base_footprint.point.x, base_footprint.point.y, base_footprint.point.z, base_footprint.header.stamp.toSec());
     }
     catch(tf2::TransformException &ex){
-        ROS_ERROR("Received an exception trying to transform a point from \"base_footprint\" to \"base_link\": %s", ex.what());
+        ROS_ERROR("Received an exception trying to transform a point from \"base_link\" to \"base_footprint\": %s", ex.what());
     }
     
     try{
-        geometry_msgs::PointStamped rear_right_wheel_link;
         rear_right_wheel_link.header.frame_id = "rear_right_wheel_link";
 
         buffer.transform(base_link, rear_right_wheel_link, "rear_right_wheel_link");
-
-        ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> rear_right_wheel_link: (%.4f, %.4f, %.4f) at time %.4f",
-        base_link.point.x, base_link.point.y, base_link.point.z,
-        rear_right_wheel_link.point.x, rear_right_wheel_link.point.y, rear_right_wheel_link.point.z, rear_right_wheel_link.header.stamp.toSec());
+        vehicle.wheel_track = 2*rear_right_wheel_link.point.y;
+        //ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> rear_right_wheel_link: (%.4f, %.4f, %.4f) at time %.4f",
+        //        base_link.point.x, base_link.point.y, base_link.point.z, rear_right_wheel_link.point.x, 
+        //        rear_right_wheel_link.point.y, rear_right_wheel_link.point.z, rear_right_wheel_link.header.stamp.toSec());
     }
     catch(tf2::TransformException &ex){
-        ROS_ERROR("Received an exception trying to transform a point from \"rear_right_wheel_link\" to \"base_link\": %s", ex.what());
+        ROS_ERROR("Received an exception trying to transform a point from \"base_link\" to \"rear_right_wheel_link\": %s", 
+                ex.what());
     }
+    
 
     try{
-        geometry_msgs::PointStamped right_steering_link;
         right_steering_link.header.frame_id = "right_steering_link";
 
-        buffer.transform(base_link, right_steering_link, "right_steering_link");
-
-        ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> right_steering_link: (%.4f, %.4f, %.4f) at time %.4f",
-        base_link.point.x, base_link.point.y, base_link.point.z,
-        right_steering_link.point.x, right_steering_link.point.y, right_steering_link.point.z, right_steering_link.header.stamp.toSec());
+        buffer.transform(rear_right_wheel_link, right_steering_link, "right_steering_link");
+        vehicle.wheel_base = -1*right_steering_link.point.x;
+        //ROS_INFO("rear_right_link: (%.4f, %.4f. %.4f) -----> right_steering_link: (%.4f, %.4f, %.4f) at time %.4f",
+        //        rear_right_wheel_link.point.x, rear_right_wheel_link.point.y, rear_right_wheel_link.point.z,
+        //        right_steering_link.point.x, right_steering_link.point.y, right_steering_link.point.z, 
+        //        right_steering_link.header.stamp.toSec());
     }
     catch(tf2::TransformException &ex){
-        ROS_ERROR("Received an exception trying to transform a point from \"right_steering_link\" to \"base_link\": %s", ex.what());
+        ROS_ERROR("Received an exception trying to transform a point from \"rear_right_wheel_link\" to"  
+                "\"right_steering_link\": %s", ex.what());
     }
 
-    try{
-        geometry_msgs::PointStamped rear_left_wheel_link;
-        rear_left_wheel_link.header.frame_id = "rear_left_wheel_link";
+    //try{
+    //    rear_left_wheel_link.header.frame_id = "rear_left_wheel_link";
 
-        buffer.transform(base_link, rear_left_wheel_link, "rear_left_wheel_link");
+    //    buffer.transform(base_link, rear_left_wheel_link, "rear_left_wheel_link");
 
-        ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> rear_left_wheel_link: (%.4f, %.4f, %.4f) at time %.4f",
-        base_link.point.x, base_link.point.y, base_link.point.z,
-        rear_left_wheel_link.point.x, rear_left_wheel_link.point.y, rear_left_wheel_link.point.z, rear_left_wheel_link.header.stamp.toSec());
-    }
-    catch(tf2::TransformException &ex){
-        ROS_ERROR("Received an exception trying to transform a point from \"rear_left_wheel_link\" to \"base_link\": %s", ex.what());
-    }
+    //    ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> rear_left_wheel_link: (%.4f, %.4f, %.4f) at time %.4f",
+    //            base_link.point.x, base_link.point.y, base_link.point.z, rear_left_wheel_link.point.x, 
+    //            rear_left_wheel_link.point.y, rear_left_wheel_link.point.z, rear_left_wheel_link.header.stamp.toSec());
+    //}
+    //catch(tf2::TransformException &ex){
+    //    ROS_ERROR("Received an exception trying to transform a point from \"rear_left_wheel_link\" to \"base_link\": %s", 
+    //            ex.what());
+    //}
 
 }
 
 
 void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Define a function called 'callback' that receives 
                                                                          // a parameter named 'msg' 
-	std::vector<std::string> names = msg->name;
-	if (msg->name[0][0] == 'f') {
+    
+    std::vector<std::string> names = msg->name;	
+    if (msg->name[0][0] == 'f') {
 	
         //ROS_INFO("%s", &names[0][0]);
         odom_data.back_wheel_w = (msg->velocity[1]+msg->velocity[2])/2;
-        odom_data.back_wheel_v = odom_data.back_wheel_w*odom_data.back_wheel_r;
+        odom_data.back_wheel_v = odom_data.back_wheel_w*vehicle.wheel_r;
 		ROS_INFO("avg= %f",odom_data.back_wheel_v);         
 	} else {
 		
@@ -110,7 +131,26 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
 }
 
 void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
-    //ROS_INFO("IMU subscribe");
+    
+    double roll, pitch, yaw;
+    tf::Quaternion q;
+
+    tf::quaternionMsgToTF(msg->orientation,q);  
+    tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
+
+    if (odom_data.init) {
+        
+        odom_data.inital.r = roll; 
+        odom_data.inital.p = pitch;
+        odom_data.inital.y = yaw;
+        odom.init = 0;
+    } else {
+        
+        odom_data.current.r = roll;
+        odom_data.current.p = pitch;
+        odom_data.current.y = yaw;
+    }
+    ROS_INFO("Yaw = %f", yaw);
 }
 
 void counterCallbackGPS(const sensor_msgs::NavSatFix::ConstPtr& msg) {
@@ -141,7 +181,7 @@ int main(int argc, char** argv) {
         tf2Received = 1;
     }
     
-    transformPoint(tf2Buffer);
+    staticTransform(tf2Buffer);
     
     ros::Subscriber sub_joint_states = nh.subscribe("/zio/joint_states", 1000, counterCallbackJoint);
     ros::Subscriber sub_imu = nh.subscribe("/vn100/imu", 1000, counterCallbackIMU);
