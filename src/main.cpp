@@ -15,6 +15,7 @@ struct odom {
     double back_wheel_w;
     double back_wheel_v;
     double back_wheel_r;
+    double wheelbase;
 };
 
 struct odom odom_data;
@@ -23,7 +24,7 @@ struct odom odom_data;
 void transformPoint(const tf2_ros::Buffer &buffer){
     //we'll create a point in the base_laser frame that we'd like to transform to the base_link frame
     geometry_msgs::PointStamped base_link;
-    base_link.header.frame_id = "base_footprint";
+    base_link.header.frame_id = "base_link";
 
     //we'll just use the most recent transform available for our simple example
     base_link.header.stamp = ros::Time();
@@ -35,16 +36,61 @@ void transformPoint(const tf2_ros::Buffer &buffer){
 
     try{
         geometry_msgs::PointStamped base_footprint;
-        buffer.transform(base_link, base_footprint, "base_link");
+        base_footprint.header.frame_id = "base_footprint";
+
+        buffer.transform(base_link, base_footprint, "base_footprint");
 
         ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> base_footprint: (%.4f, %.4f, %.4f) at time %.4f",
-            base_link.point.x, base_link.point.y, base_link.point.z,
-            base_footprint.point.x, base_footprint.point.y, base_footprint.point.z, base_footprint.header.stamp.toSec());
-            odom_data.back_wheel_r  = base_footprint.point.z;
+        base_link.point.x, base_link.point.y, base_link.point.z,
+        base_footprint.point.x, base_footprint.point.y, base_footprint.point.z, base_footprint.header.stamp.toSec());
+        odom_data.back_wheel_r  = base_footprint.point.z;
     }
     catch(tf2::TransformException &ex){
         ROS_ERROR("Received an exception trying to transform a point from \"base_footprint\" to \"base_link\": %s", ex.what());
     }
+    
+    try{
+        geometry_msgs::PointStamped rear_right_wheel_link;
+        rear_right_wheel_link.header.frame_id = "rear_right_wheel_link";
+
+        buffer.transform(base_link, rear_right_wheel_link, "rear_right_wheel_link");
+
+        ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> rear_right_wheel_link: (%.4f, %.4f, %.4f) at time %.4f",
+        base_link.point.x, base_link.point.y, base_link.point.z,
+        rear_right_wheel_link.point.x, rear_right_wheel_link.point.y, rear_right_wheel_link.point.z, rear_right_wheel_link.header.stamp.toSec());
+    }
+    catch(tf2::TransformException &ex){
+        ROS_ERROR("Received an exception trying to transform a point from \"rear_right_wheel_link\" to \"base_link\": %s", ex.what());
+    }
+
+    try{
+        geometry_msgs::PointStamped right_steering_link;
+        right_steering_link.header.frame_id = "right_steering_link";
+
+        buffer.transform(base_link, right_steering_link, "right_steering_link");
+
+        ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> right_steering_link: (%.4f, %.4f, %.4f) at time %.4f",
+        base_link.point.x, base_link.point.y, base_link.point.z,
+        right_steering_link.point.x, right_steering_link.point.y, right_steering_link.point.z, right_steering_link.header.stamp.toSec());
+    }
+    catch(tf2::TransformException &ex){
+        ROS_ERROR("Received an exception trying to transform a point from \"right_steering_link\" to \"base_link\": %s", ex.what());
+    }
+
+    try{
+        geometry_msgs::PointStamped rear_left_wheel_link;
+        rear_left_wheel_link.header.frame_id = "rear_left_wheel_link";
+
+        buffer.transform(base_link, rear_left_wheel_link, "rear_left_wheel_link");
+
+        ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> rear_left_wheel_link: (%.4f, %.4f, %.4f) at time %.4f",
+        base_link.point.x, base_link.point.y, base_link.point.z,
+        rear_left_wheel_link.point.x, rear_left_wheel_link.point.y, rear_left_wheel_link.point.z, rear_left_wheel_link.header.stamp.toSec());
+    }
+    catch(tf2::TransformException &ex){
+        ROS_ERROR("Received an exception trying to transform a point from \"rear_left_wheel_link\" to \"base_link\": %s", ex.what());
+    }
+
 }
 
 
@@ -53,21 +99,22 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
 	std::vector<std::string> names = msg->name;
 	if (msg->name[0][0] == 'f') {
 	
-        ROS_INFO("%s", &names[0][0]);
-        odom_data.back_wheel_v = (msg->velocity[1]+msg->velocity[2])/2;
-		ROS_INFO("avg= %f",odom_data.back_wheel_v);
+        //ROS_INFO("%s", &names[0][0]);
+        odom_data.back_wheel_w = (msg->velocity[1]+msg->velocity[2])/2;
+        odom_data.back_wheel_v = odom_data.back_wheel_w*odom_data.back_wheel_r;
+		ROS_INFO("avg= %f",odom_data.back_wheel_v);         
 	} else {
 		
-        ROS_INFO("%s", &names[0][0]);
+        //ROS_INFO("%s", &names[0][0]);
 	}
 }
 
 void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
-    ROS_INFO("IMU subscribe");
+    //ROS_INFO("IMU subscribe");
 }
 
 void counterCallbackGPS(const sensor_msgs::NavSatFix::ConstPtr& msg) {
-    ROS_INFO("GPS subscribe");
+    //ROS_INFO("GPS subscribe");
 }
 
 
