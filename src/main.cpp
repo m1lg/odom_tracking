@@ -136,7 +136,7 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
         sensor_data.time1 = sensor_data.time2;
         sensor_data.time2 = msg->header.stamp;
         sensor_data.dt = sensor_data.time2 - sensor_data.time1;
-        ROS_INFO("dt = %f", sensor_data.dt.toSec());
+        ROS_INFO("dxtggkkt = %f", sensor_data.dt.toSec());
 
 	} else {
 		
@@ -158,12 +158,16 @@ void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
         sensor_data.inital.p = pitch;
         sensor_data.inital.y = yaw;
         sensor_data.init = 0;
+        
     } else {
         
         sensor_data.current.r = roll;
         sensor_data.current.p = pitch;
         sensor_data.current.y = yaw;
+        
     } 
+    
+    ROS_INFO("yaw = %f", sensor_data.current.y);
 }
 
 void counterCallbackGPS(const sensor_msgs::NavSatFix::ConstPtr& msg) {
