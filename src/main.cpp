@@ -57,7 +57,7 @@ void staticTransform(const tf2_ros::Buffer &buffer){
     geometry_msgs::PointStamped right_steering_link;
 
     base_link.header.frame_id = "base_link";
-    //we'll just use the most recent transform available for our simple example
+    //We'll just use the most recent transform available for our simple example
     base_link.header.stamp = ros::Time();
 
     //just an arbitrary point in space
