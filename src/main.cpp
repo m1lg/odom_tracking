@@ -2,6 +2,7 @@
 #include <time.h>
 #include <string>
 #include <geometry_msgs/PointStamped.h>
+#include <math.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/Header.h>
@@ -30,8 +31,10 @@ struct joint {
     ros::Time time1;
     ros::Time time2;
     ros::Duration dt;
-    double back_wheel_old;
-    double back_wheel_v;
+    double dx;
+    double dy;
+    double back_wheel_v1;
+    double back_wheel_v2;
     struct imu inital;
     struct imu current;
     bool init = 1;
@@ -49,15 +52,15 @@ struct joint sensor_data;
 struct dim vehicle;
 
 void staticTransform(const tf2_ros::Buffer &buffer){
-    //we'll create a point in the base_laser frame that we'd like to transform to the base_link frame
+    //create points for dimensional transforms of car
     geometry_msgs::PointStamped base_link;
     geometry_msgs::PointStamped base_footprint;
     geometry_msgs::PointStamped rear_right_wheel_link;
     geometry_msgs::PointStamped rear_left_wheel_link;
     geometry_msgs::PointStamped right_steering_link;
 
+
     base_link.header.frame_id = "base_link";
-    //We'll just use the most recent transform available for our simple example
     base_link.header.stamp = ros::Time();
 
     //just an arbitrary point in space
@@ -65,85 +68,54 @@ void staticTransform(const tf2_ros::Buffer &buffer){
     base_link.point.y = 0;
     base_link.point.z = 0;
 
-    try{
-        base_footprint.header.frame_id = "base_footprint";
-
-        buffer.transform(base_link, base_footprint, "base_footprint");
-        vehicle.wheel_r = base_footprint.point.z;
-        //ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> base_footprint: (%.4f, %.4f, %.4f) at time %.4f",
-        //        base_link.point.x, base_link.point.y, base_link.point.z,
-        //        base_footprint.point.x, base_footprint.point.y, base_footprint.point.z, base_footprint.header.stamp.toSec());
-    }
-    catch(tf2::TransformException &ex){
-        ROS_ERROR("Received an exception trying to transform a point from \"base_link\" to \"base_footprint\": %s", ex.what());
-    }
     
-    try{
-        rear_right_wheel_link.header.frame_id = "rear_right_wheel_link";
-
-        buffer.transform(base_link, rear_right_wheel_link, "rear_right_wheel_link");
-        vehicle.wheel_track = 2*rear_right_wheel_link.point.y;
-        //ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> rear_right_wheel_link: (%.4f, %.4f, %.4f) at time %.4f",
-        //        base_link.point.x, base_link.point.y, base_link.point.z, rear_right_wheel_link.point.x, 
-        //        rear_right_wheel_link.point.y, rear_right_wheel_link.point.z, rear_right_wheel_link.header.stamp.toSec());
-    }
-    catch(tf2::TransformException &ex){
-        ROS_ERROR("Received an exception trying to transform a point from \"base_link\" to \"rear_right_wheel_link\": %s", 
-                ex.what());
-    }
+    base_footprint.header.frame_id = "base_footprint";
+    buffer.transform(base_link, base_footprint, "base_footprint");
+    vehicle.wheel_r = base_footprint.point.z;              //base footprint is on the ground, the transform from baselink will give the wheel radius measurement
     
 
-    try{
-        right_steering_link.header.frame_id = "right_steering_link";
+    rear_right_wheel_link.header.frame_id = "rear_right_wheel_link";
+    buffer.transform(base_link, rear_right_wheel_link, "rear_right_wheel_link");
+    vehicle.wheel_track = 2*rear_right_wheel_link.point.y;    //the transform from baselink to the rear right wheel link is half the measurement of the track of the car
+    
 
-        buffer.transform(rear_right_wheel_link, right_steering_link, "right_steering_link");
-        vehicle.wheel_base = -1*right_steering_link.point.x;
-        //ROS_INFO("rear_right_link: (%.4f, %.4f. %.4f) -----> right_steering_link: (%.4f, %.4f, %.4f) at time %.4f",
-        //        rear_right_wheel_link.point.x, rear_right_wheel_link.point.y, rear_right_wheel_link.point.z,
-        //        right_steering_link.point.x, right_steering_link.point.y, right_steering_link.point.z, 
-        //        right_steering_link.header.stamp.toSec());
-    }
-    catch(tf2::TransformException &ex){
-        ROS_ERROR("Received an exception trying to transform a point from \"rear_right_wheel_link\" to"  
-                "\"right_steering_link\": %s", ex.what());
-    }
+    right_steering_link.header.frame_id = "right_steering_link";
+    buffer.transform(rear_right_wheel_link, right_steering_link, "right_steering_link");
+    vehicle.wheel_base = -1*right_steering_link.point.x;       //the transform from the rear right wheel to the right steering link will give us the wheel base measurment in the x direction
+        
 
-    //try{
-    //    rear_left_wheel_link.header.frame_id = "rear_left_wheel_link";
-
-    //    buffer.transform(base_link, rear_left_wheel_link, "rear_left_wheel_link");
-
-    //    ROS_INFO("base_link: (%.4f, %.4f. %.4f) -----> rear_left_wheel_link: (%.4f, %.4f, %.4f) at time %.4f",
-    //            base_link.point.x, base_link.point.y, base_link.point.z, rear_left_wheel_link.point.x, 
-    //            rear_left_wheel_link.point.y, rear_left_wheel_link.point.z, rear_left_wheel_link.header.stamp.toSec());
-    //}
-    //catch(tf2::TransformException &ex){
-    //    ROS_ERROR("Received an exception trying to transform a point from \"rear_left_wheel_link\" to \"base_link\": %s", 
-    //            ex.what());
-    //}
+    
+    rear_left_wheel_link.header.frame_id = "rear_left_wheel_link";
+    buffer.transform(base_link, rear_left_wheel_link, "rear_left_wheel_link");
 
 }
 
-
-void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Define a function called 'callback' that receives 
-                                                                         // a parameter named 'msg' 
-    
+//callback for handling the motion data from the joint states
+void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Define a function called 'callback' that receives a parameter named 'msg' 
+                                                                       
     std::vector<std::string> names = msg->name;	
-    if (msg->name[0][0] == 'f') {
+    if (msg->name[0][0] == 'f') {                              //if the first letter of the first name in the array is f then we have the velocity data
         double angular_v;
-        angular_v = (msg->velocity[1]+msg->velocity[2])/2;
-        sensor_data.back_wheel_v = angular_v*vehicle.wheel_r;	
-        sensor_data.time1 = sensor_data.time2;
-        sensor_data.time2 = msg->header.stamp;
-        sensor_data.dt = sensor_data.time2 - sensor_data.time1;
-        ROS_INFO("dxtggkkt = %f", sensor_data.dt.toSec());
-
-	} else {
-		
-        //ROS_INFO("%s", &names[0][0]);
-	}
+        angular_v = (msg->velocity[1]+msg->velocity[2])/2;     //centre of vehicle/baselink velocity wheel be the average of the two rear wheel velocities
+        sensor_data.back_wheel_v1 = sensor_data.back_wheel_v2;
+        sensor_data.back_wheel_v2 = angular_v*vehicle.wheel_r;  //linear velocity = angular velocity * wheel radius
+        sensor_data.time1 = sensor_data.time2;                 //previous time stored
+        sensor_data.time2 = msg->header.stamp;                 //save current time from sensor header time stamp
+        sensor_data.dt = sensor_data.time2 - sensor_data.time1;  //dt is the difference between current time and previous time 
+        
+        if (sensor_data.dt.toSec() < 1){   //first time is un initialised and > than 1, this ensures we disregard that
+            ROS_INFO("Bag started");
+            ROS_INFO("dt = %f", sensor_data.dt.toSec());  //showing change of time 
+            
+        } else if (sensor_data.dt.toSec() < 0){     // When bag file loops, dt is < 0, 
+            ROS_INFO("End of bag file reached");  // End program when end of bag file is reached
+            exit(0);
+        }
+        
+	} 
 }
 
+//Callback for handling the IMU data input
 void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
     
     double roll, pitch, yaw;
@@ -161,52 +133,52 @@ void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
         
     } else {
         
-        sensor_data.current.r = roll;
-        sensor_data.current.p = pitch;
-        sensor_data.current.y = yaw;
-        
+        sensor_data.current.r = roll*(180/M_PI);    //converting radians to degrees
+        sensor_data.current.p = pitch*(180/M_PI);
+        sensor_data.current.y = yaw*(180/M_PI)*-1;
+  
     } 
     
     ROS_INFO("yaw = %f", sensor_data.current.y);
 }
 
+//callback for handling the GPS data input
 void counterCallbackGPS(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     //ROS_INFO("GPS subscribe");
 }
 
-
+//main node for handling the sequence of the programs execution
 int main(int argc, char** argv) {
     	
 	bool tf2Received = 0;
+	sensor_data.back_wheel_v2 = 0;
     ros::init(argc, argv, "odom_tracking"); // Initiate a Node called 'odom_tracking'
-    ros::NodeHandle nh;
+    ros::NodeHandle nh;                     // initiate a node handler
 
-    tf2_ros::Buffer tf2Buffer;
-    tf2_ros::TransformListener tf2Listener(tf2Buffer);
-    while(!tf2Received) {
-
+    tf2_ros::Buffer tf2Buffer;              //create a buffer for handling transform data
+    tf2_ros::TransformListener tf2Listener(tf2Buffer);  //listen for the transform data 
+    
+    while(!tf2Received) {                     //wait until transform data has started transmitting to proceed
+    
         geometry_msgs::TransformStamped transformStamped;
         try {
             transformStamped = tf2Buffer.lookupTransform("base_link", "base_footprint",
             ros::Time::now());//, ros::Duration(10.0));
         }
         catch (tf2::TransformException &ex) {
-            ROS_WARN("%s",ex.what());
+            ROS_WARN("%s",ex.what());           //warn data hasnt been recieved 
             ros::Duration(1.0).sleep();
             continue;
         }
         tf2Received = 1;
     }
     
-    staticTransform(tf2Buffer);
+    staticTransform(tf2Buffer); //run static transforms with the transform data
     
-    ros::Subscriber sub_joint_states = nh.subscribe("/zio/joint_states", 1000, counterCallbackJoint);
-    ros::Subscriber sub_imu = nh.subscribe("/vn100/imu", 1000, counterCallbackIMU);
-    ros::Subscriber sub_gps = nh.subscribe("/ublox_gps/fix", 1000, counterCallbackGPS);
-    // Create a Subscriber object that will listen 
-    // to the /counter topic and will call the 
-    // 'callback' function each time it reads 
-    // somethin from the topic
+    ros::Subscriber sub_joint_states = nh.subscribe("/zio/joint_states", 1000, counterCallbackJoint);   //create a subscriber that listens for the joint states data
+    ros::Subscriber sub_imu = nh.subscribe("/vn100/imu", 1000, counterCallbackIMU); //create a subscriber that listens for the IMU data
+    ros::Subscriber sub_gps = nh.subscribe("/ublox_gps/fix", 1000, counterCallbackGPS); //create a subscriber that listens for the gps data
+    
    
     ros::Rate loop_rate(50); // Set a publish rate of 2 Hz
 
