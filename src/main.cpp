@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include <time.h>
 #include <string>
 #include <geometry_msgs/PointStamped.h>
 #include <std_msgs/Int32.h>
@@ -26,8 +27,9 @@ struct dim {
 
 
 struct joint {
-    //time time1;
-    //time time2;
+    ros::Time time1;
+    ros::Time time2;
+    ros::Duration dt;
     double back_wheel_old;
     double back_wheel_v;
     struct imu inital;
@@ -131,6 +133,10 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
         double angular_v;
         angular_v = (msg->velocity[1]+msg->velocity[2])/2;
         sensor_data.back_wheel_v = angular_v*vehicle.wheel_r;	
+        sensor_data.time1 = sensor_data.time2;
+        sensor_data.time2 = msg->header.stamp;
+        sensor_data.dt = sensor_data.time2 - sensor_data.time1;
+        ROS_INFO("dt = %f", sensor_data.dt.toSec());
 
 	} else {
 		
