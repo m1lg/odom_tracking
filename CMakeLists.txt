@@ -152,9 +152,7 @@ include_directories(
 
 add_executable(egg src/main.cpp)
 add_dependencies(egg ${egg_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(egg
-   ${catkin_LIBRARIES}
-)
+target_link_libraries(egg ${catkin_LIBRARIES})
 
 #############
 ## Install ##
