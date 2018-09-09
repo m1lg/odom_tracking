@@ -148,9 +148,8 @@ void calculateOdom(void){
     odom.pose.pose.position.z = odometry.z;
     odom.pose.pose.orientation = odom_quat;
     
-    //odom.twist.twist.linear.x = odometry.v*sin(odometry.degrees.yaw);
-    //odom.twist.twist.linear.y = odometry.v*cos(odometry.degrees.yaw);
-    //odom.twist.twist.angular.z = odometry.degrees.yaw;
+    odom.twist.twist.linear.x = sin(odometry.rad.yaw);
+    odom.twist.twist.linear.y = cos(odometry.rad.yaw);
     
     odom_pub.publish(odom);
     
