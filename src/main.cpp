@@ -51,7 +51,7 @@ struct odom {
 struct joint sensor_data;
 struct dim vehicle;
 
-void staticTransform(const tf2_ros::Buffer &buffer){
+void jointTransforms(const tf2_ros::Buffer &buffer){
     //create points for dimensional transforms of car
     geometry_msgs::PointStamped base_link;
     geometry_msgs::PointStamped base_footprint;
@@ -104,8 +104,13 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
         sensor_data.dt = sensor_data.time2 - sensor_data.time1;  //dt is the difference between current time and previous time 
         
         if (sensor_data.dt.toSec() < 1){   //first time is un initialised and > than 1, this ensures we disregard that
-            ROS_INFO("Bag started");
-            ROS_INFO("dt = %f", sensor_data.dt.toSec());  //showing change of time 
+      
+            //ROS_INFO("dt = %f", sensor_data.dt.toSec());  //showing change of time           
+            sensor_data.dx = ((sensor_data.back_wheel_v1 + sensor_data.back_wheel_v2)/2)*cos(sensor_data.current.y)*sensor_data.dt.toSec();
+            sensor_data.dy = ((sensor_data.back_wheel_v1 + sensor_data.back_wheel_v2)/2)*sin(sensor_data.current.y)*sensor_data.dt.toSec();
+            ROS_INFO("dx = %f", sensor_data.dx);
+            ROS_INFO("dy = %f", sensor_data.dy);
+            
             
         } else if (sensor_data.dt.toSec() < 0){     // When bag file loops, dt is < 0, 
             ROS_INFO("End of bag file reached");  // End program when end of bag file is reached
@@ -135,11 +140,11 @@ void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
         
         sensor_data.current.r = roll*(180/M_PI);    //converting radians to degrees
         sensor_data.current.p = pitch*(180/M_PI);
-        sensor_data.current.y = yaw*(180/M_PI)*-1;
+        sensor_data.current.y = yaw*(180/M_PI);
   
     } 
     
-    ROS_INFO("yaw = %f", sensor_data.current.y);
+    //ROS_INFO("yaw = %f", sensor_data.current.y);
 }
 
 //callback for handling the GPS data input
@@ -173,7 +178,8 @@ int main(int argc, char** argv) {
         tf2Received = 1;
     }
     
-    staticTransform(tf2Buffer); //run static transforms with the transform data
+    ROS_INFO("Bag file started");
+    jointTransforms(tf2Buffer); //run static transforms with the transform data
     
     ros::Subscriber sub_joint_states = nh.subscribe("/zio/joint_states", 1000, counterCallbackJoint);   //create a subscriber that listens for the joint states data
     ros::Subscriber sub_imu = nh.subscribe("/vn100/imu", 1000, counterCallbackIMU); //create a subscriber that listens for the IMU data
