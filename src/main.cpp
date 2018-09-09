@@ -106,10 +106,10 @@ void calculateOdom(void){
     //static tf::TransformBroadcaster odom_broadcaster;
     
     
-    odometry.dx = (odometry.v*sin(odometry.rad.yaw)*sensor_data.dt.toSec());
-    odometry.dy = (odometry.v*cos(odometry.rad.yaw)*sensor_data.dt.toSec());
-    odometry.x += odometry.dx;
-    odometry.y += odometry.dy;
+    odometry.dx = (odometry.v*cos(odometry.rad.yaw)*sensor_data.dt.toSec());
+    odometry.dy = (odometry.v*sin(odometry.rad.yaw)*sensor_data.dt.toSec());
+    odometry.x -= odometry.dx;
+    odometry.y -= odometry.dy;
     
     geometry_msgs::Quaternion odom_quat;
     tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
@@ -148,8 +148,8 @@ void calculateOdom(void){
     odom.pose.pose.position.z = odometry.z;
     odom.pose.pose.orientation = odom_quat;
     
-    odom.twist.twist.linear.x = sin(odometry.rad.yaw);
-    odom.twist.twist.linear.y = cos(odometry.rad.yaw);
+    odom.twist.twist.linear.x = cos(odometry.rad.yaw);
+    odom.twist.twist.linear.y = sin(odometry.rad.yaw);
     
     odom_pub.publish(odom);
     
@@ -178,8 +178,12 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
             calculateOdom();
             
         } else if (sensor_data.dt.toSec() < 0){     // When bag file loops, dt is < 0, 
-            ROS_INFO("End of bag file reached");  // End program when end of bag file is reached
-            exit(0);
+            odometry.x = 0;
+            odometry.y = 0;
+            sensor_data.time1 = ros::Time(0,10000000);
+
+            //ROS_INFO("End of bag file reached");  // End program when end of bag file is reached
+            //exit(0);
         }
         
 	} 
@@ -188,13 +192,9 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
 //Callback for handling the IMU data input
 void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
 
-    
-
     tf::quaternionMsgToTF(msg->orientation, odometry.odom_quat_tf);  
     tf::Matrix3x3(odometry.odom_quat_tf).getRPY(odometry.rad.roll, odometry.rad.pitch , odometry.rad.yaw);
-    
-
-        
+            
     odometry.degree.roll = odometry.rad.roll*(180/M_PI);    //converting radians to degrees
     odometry.degree.pitch = odometry.rad.pitch*(180/M_PI);
     odometry.degree.yaw = odometry.rad.yaw*(180/M_PI);
