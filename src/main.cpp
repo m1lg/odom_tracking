@@ -55,6 +55,8 @@ struct odom odometry;
 struct joint sensor_data;
 struct dim vehicle;
 
+ros::Publisher odom_pub;
+
 void jointTransforms(const tf2_ros::Buffer &buffer){
     //create points for dimensional transforms of car
     geometry_msgs::PointStamped base_link;
@@ -102,9 +104,8 @@ void jointTransforms(const tf2_ros::Buffer &buffer){
 
 void calculateOdom(void){
     
-    ros::NodeHandle nh;   
     
-    ros::Publisher odom_pub = nh.advertise<nav_msgs::Odometry>("odom", 1000);
+    
     tf2_ros::TransformBroadcaster odom_broadcaster;
     
     
@@ -143,12 +144,13 @@ void calculateOdom(void){
     
     odom.twist.twist.linear.x = odometry.v*sin(odometry.degrees.yaw);
     odom.twist.twist.linear.y = odometry.v*cos(odometry.degrees.yaw);
+    odom.twist.twist.angular.z = odometry.degrees.yaw;
     
     odom_pub.publish(odom);
     
     
-    ROS_INFO("x = %f", odometry.x);
     
+    ROS_INFO("v = %f", odometry.v);
 }
 
 //callback for handling the motion data from the joint states
@@ -165,7 +167,7 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
         sensor_data.time2 = msg->header.stamp;                 //save current time from sensor header time stamp
         sensor_data.dt = sensor_data.time2 - sensor_data.time1;  //dt is the difference between current time and previous time 
         
-        if (sensor_data.dt.toSec() < 1){   //first time is un initialised and > than 1, this ensures we disregard that
+        if ((sensor_data.dt.toSec() < 1)&&(sensor_data.dt.toSec() > 0)){   //first time is un initialised and > than 1, this ensures we disregard that
       
             //ROS_INFO("dt = %f", sensor_data.dt.toSec());  //showing change of time           
             calculateOdom();
@@ -233,6 +235,7 @@ int main(int argc, char** argv) {
     ros::Subscriber sub_joint_states = nh.subscribe("/zio/joint_states", 1000, counterCallbackJoint);   //create a subscriber that listens for the joint states data
     ros::Subscriber sub_imu = nh.subscribe("/vn100/imu", 1000, counterCallbackIMU); //create a subscriber that listens for the IMU data
     ros::Subscriber sub_gps = nh.subscribe("/ublox_gps/fix", 1000, counterCallbackGPS); //create a subscriber that listens for the gps data
+    odom_pub = nh.advertise<nav_msgs::Odometry>("odom", 50);
     
    
     ros::Rate loop_rate(50); // Set a publish rate of 2 Hz
