@@ -15,6 +15,8 @@
 #include <tf2_ros/message_filter.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf/tf.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf/transform_broadcaster.h>
 #include <tf/transform_datatypes.h>
 
 struct imu {
@@ -39,8 +41,8 @@ struct joint {
 };
 
 struct odom {
-    struct imu degrees;
-    struct imu quat;
+    struct imu degree;
+    struct imu rad;
     tf::Quaternion odom_quat_tf;
     double dx;
     double dy;
@@ -101,30 +103,39 @@ void calculateOdom(void){
     
     
     
-    static tf::TransformBroadcaster odom_broadcaster;
+    //static tf::TransformBroadcaster odom_broadcaster;
     
     
-    odometry.dx = (odometry.v*sin(odometry.degrees.yaw)*sensor_data.dt.toSec());
-    odometry.dy = (odometry.v*cos(odometry.degrees.yaw)*sensor_data.dt.toSec());
+    odometry.dx = (odometry.v*sin(odometry.rad.yaw)*sensor_data.dt.toSec());
+    odometry.dy = (odometry.v*cos(odometry.rad.yaw)*sensor_data.dt.toSec());
     odometry.x += odometry.dx;
     odometry.y += odometry.dy;
     
     geometry_msgs::Quaternion odom_quat;
     tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
+
+
+    //tf::Transform transform;
+    //transform.setOrigin( tf::Vector3(odometry.x, odometry.y, 0.0) );
+    //tf::Quaternion q(0,0,0,1);
+    //q.setEuler(0, 0, odom_quat);
+    //transform.setRotation(q);
+    //odom_broadcaster.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_link", "testing"));
     
     
-    geometry_msgs::TransformStamped odom_transform;
-    odom_transform.header.stamp = sensor_data.time2;
-    odom_transform.header.frame_id = "odom";
-    odom_transform.child_frame_id = "base_link";
     
-    odom_transform.transform.translation.x = odometry.x;
-    odom_transform.transform.translation.y = odometry.y;
-    odom_transform.transform.translation.z = odometry.z;
-    odom_transform.transform.rotation = odom_quat;
+    //geometry_msgs::TransformStamped odom_transform;
+    //odom_transform.header.stamp = sensor_data.time2;
+    //odom_transform.header.frame_id = "tfbroadcast";
+    //odom_transform.child_frame_id = "base_link";
+    
+    //odom_transform.transform.translation.x = odometry.x;
+    //odom_transform.transform.translation.y = odometry.y;
+    //odom_transform.transform.translation.z = odometry.z;
+    //odom_transform.transform.rotation = odom_quat;
     
     
-    odom_broadcaster.sendTransform(odom_transform);
+    //odom_broadcaster.sendTransform(odom_transform);
     
     nav_msgs::Odometry odom;
     odom.header.stamp = sensor_data.time2;
@@ -145,7 +156,7 @@ void calculateOdom(void){
     
     
     
-    ROS_INFO("v = %f", odometry.v);
+    ROS_INFO("x = %f\t y = %f\t", odometry.dx, odometry.dy);
 }
 
 //callback for handling the motion data from the joint states
@@ -181,13 +192,13 @@ void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
     
 
     tf::quaternionMsgToTF(msg->orientation, odometry.odom_quat_tf);  
-    tf::Matrix3x3(odometry.odom_quat_tf).getRPY(odometry.quat.roll, odometry.quat.pitch , odometry.quat.yaw);
+    tf::Matrix3x3(odometry.odom_quat_tf).getRPY(odometry.rad.roll, odometry.rad.pitch , odometry.rad.yaw);
     
 
         
-    odometry.degrees.roll = odometry.quat.roll*(180/M_PI);    //converting radians to degrees
-    odometry.degrees.pitch = odometry.quat.pitch*(180/M_PI);
-    odometry.degrees.yaw = odometry.quat.yaw*(180/M_PI);
+    odometry.degree.roll = odometry.rad.roll*(180/M_PI);    //converting radians to degrees
+    odometry.degree.pitch = odometry.rad.pitch*(180/M_PI);
+    odometry.degree.yaw = odometry.rad.yaw*(180/M_PI);
     
 
     //ROS_INFO("yaw = %f", sensor_data.current.y);
