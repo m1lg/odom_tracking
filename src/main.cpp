@@ -3,21 +3,24 @@
 #include <string>
 #include <geometry_msgs/PointStamped.h>
 #include <math.h>
+#include <nav_msgs/Odometry.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/Header.h>
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <tf/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/message_filter.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf/tf.h>
+#include <tf/transform_datatypes.h>
 
 struct imu {
-    double r;
-    double p;
-    double y;
+    double roll;
+    double pitch;
+    double yaw;
 };
 
 struct dim {
@@ -28,26 +31,27 @@ struct dim {
 
 
 struct joint {
+    double back_wheel_v1;
+    double back_wheel_v2;
     ros::Time time1;
     ros::Time time2;
     ros::Duration dt;
-    double dx;
-    double dy;
-    double back_wheel_v1;
-    double back_wheel_v2;
-    struct imu inital;
-    struct imu current;
-    bool init = 1;
 };
 
 struct odom {
-    
+    struct imu degrees;
+    struct imu quat;
+    tf::Quaternion odom_quat_tf;
+    double dx;
+    double dy;
+    double x;
+    double y;
+    double z;
+    double v;
     //time stamp;
-
-
 };
 
-
+struct odom odometry;
 struct joint sensor_data;
 struct dim vehicle;
 
@@ -62,11 +66,16 @@ void jointTransforms(const tf2_ros::Buffer &buffer){
 
     base_link.header.frame_id = "base_link";
     base_link.header.stamp = ros::Time();
-
+    
+    
     //just an arbitrary point in space
     base_link.point.x = 0;
     base_link.point.y = 0;
     base_link.point.z = 0;
+    
+    odometry.x = 0;
+    odometry.y = 0;
+    
 
     
     base_footprint.header.frame_id = "base_footprint";
@@ -90,6 +99,58 @@ void jointTransforms(const tf2_ros::Buffer &buffer){
 
 }
 
+
+void calculateOdom(void){
+    
+    ros::NodeHandle nh;   
+    
+    ros::Publisher odom_pub = nh.advertise<nav_msgs::Odometry>("odom", 1000);
+    tf2_ros::TransformBroadcaster odom_broadcaster;
+    
+    
+    odometry.dx = (odometry.v*sin(odometry.degrees.yaw)*sensor_data.dt.toSec());
+    odometry.dy = (odometry.v*cos(odometry.degrees.yaw)*sensor_data.dt.toSec());
+    odometry.x += odometry.dx;
+    odometry.y += odometry.dy;
+    
+    geometry_msgs::Quaternion odom_quat;
+    tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
+    
+    
+    geometry_msgs::TransformStamped odom_transform;
+    odom_transform.header.stamp = sensor_data.time2;
+    odom_transform.header.frame_id = "odom";
+    odom_transform.child_frame_id = "base_link";
+    
+    odom_transform.transform.translation.x = odometry.x;
+    odom_transform.transform.translation.y = odometry.y;
+    odom_transform.transform.translation.z = odometry.z;
+    odom_transform.transform.rotation = odom_quat;
+    
+    
+    odom_broadcaster.sendTransform(odom_transform);
+    
+    nav_msgs::Odometry odom;
+    odom.header.stamp = sensor_data.time2;
+    odom.header.frame_id = "odom";
+    odom.child_frame_id = "base_link";
+    
+    
+    odom.pose.pose.position.x = odometry.x;
+    odom.pose.pose.position.y = odometry.y;
+    odom.pose.pose.position.z = odometry.z;
+    odom.pose.pose.orientation = odom_quat;
+    
+    odom.twist.twist.linear.x = odometry.v*sin(odometry.degrees.yaw);
+    odom.twist.twist.linear.y = odometry.v*cos(odometry.degrees.yaw);
+    
+    odom_pub.publish(odom);
+    
+    
+    ROS_INFO("x = %f", odometry.x);
+    
+}
+
 //callback for handling the motion data from the joint states
 void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Define a function called 'callback' that receives a parameter named 'msg' 
                                                                        
@@ -99,6 +160,7 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
         angular_v = (msg->velocity[1]+msg->velocity[2])/2;     //centre of vehicle/baselink velocity wheel be the average of the two rear wheel velocities
         sensor_data.back_wheel_v1 = sensor_data.back_wheel_v2;
         sensor_data.back_wheel_v2 = angular_v*vehicle.wheel_r;  //linear velocity = angular velocity * wheel radius
+        odometry.v =  (sensor_data.back_wheel_v1 + sensor_data.back_wheel_v2)/2;
         sensor_data.time1 = sensor_data.time2;                 //previous time stored
         sensor_data.time2 = msg->header.stamp;                 //save current time from sensor header time stamp
         sensor_data.dt = sensor_data.time2 - sensor_data.time1;  //dt is the difference between current time and previous time 
@@ -106,11 +168,7 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
         if (sensor_data.dt.toSec() < 1){   //first time is un initialised and > than 1, this ensures we disregard that
       
             //ROS_INFO("dt = %f", sensor_data.dt.toSec());  //showing change of time           
-            sensor_data.dx = ((sensor_data.back_wheel_v1 + sensor_data.back_wheel_v2)/2)*cos(sensor_data.current.y)*sensor_data.dt.toSec();
-            sensor_data.dy = ((sensor_data.back_wheel_v1 + sensor_data.back_wheel_v2)/2)*sin(sensor_data.current.y)*sensor_data.dt.toSec();
-            ROS_INFO("dx = %f", sensor_data.dx);
-            ROS_INFO("dy = %f", sensor_data.dy);
-            
+            calculateOdom();
             
         } else if (sensor_data.dt.toSec() < 0){     // When bag file loops, dt is < 0, 
             ROS_INFO("End of bag file reached");  // End program when end of bag file is reached
@@ -122,28 +180,19 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
 
 //Callback for handling the IMU data input
 void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
-    
-    double roll, pitch, yaw;
-    tf::Quaternion q;
 
-    tf::quaternionMsgToTF(msg->orientation,q);  
-    tf::Matrix3x3(q).getRPY(roll, pitch, yaw);
-
-    if (sensor_data.init) {
-        
-        sensor_data.inital.r = roll; 
-        sensor_data.inital.p = pitch;
-        sensor_data.inital.y = yaw;
-        sensor_data.init = 0;
-        
-    } else {
-        
-        sensor_data.current.r = roll*(180/M_PI);    //converting radians to degrees
-        sensor_data.current.p = pitch*(180/M_PI);
-        sensor_data.current.y = yaw*(180/M_PI);
-  
-    } 
     
+
+    tf::quaternionMsgToTF(msg->orientation, odometry.odom_quat_tf);  
+    tf::Matrix3x3(odometry.odom_quat_tf).getRPY(odometry.quat.roll, odometry.quat.pitch , odometry.quat.yaw);
+    
+
+        
+    odometry.degrees.roll = odometry.quat.roll*(180/M_PI);    //converting radians to degrees
+    odometry.degrees.pitch = odometry.quat.pitch*(180/M_PI);
+    odometry.degrees.yaw = odometry.quat.yaw*(180/M_PI);
+    
+
     //ROS_INFO("yaw = %f", sensor_data.current.y);
 }
 
