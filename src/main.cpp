@@ -67,21 +67,19 @@ void jointTransforms(const tf2_ros::Buffer &buffer){
     geometry_msgs::PointStamped rear_left_wheel_link;
     geometry_msgs::PointStamped right_steering_link;
 
-
+    
     base_link.header.frame_id = "base_link";
-    base_link.header.stamp = ros::Time();
-    
-    
+    base_link.header.stamp = ros::Time(); 
     //just an arbitrary point in space
     base_link.point.x = 0;
     base_link.point.y = 0;
     base_link.point.z = 0;
     
+
     base_footprint.header.frame_id = "base_footprint";
     buffer.transform(base_link, base_footprint, "base_footprint");
-    vehicle.wheel_r = base_footprint.point.z;              //base footprint is on the ground, the transform from baselink will give the wheel radius measurement
+    vehicle.wheel_r = base_footprint.point.z; //base footprint is on the ground, the transform from baselink will give the wheel radius measurement
     
-
     rear_right_wheel_link.header.frame_id = "rear_right_wheel_link";
     buffer.transform(base_link, rear_right_wheel_link, "rear_right_wheel_link");
     vehicle.wheel_track = 2*rear_right_wheel_link.point.y;    //the transform from baselink to the rear right wheel link is half the measurement of the track of the car
@@ -103,7 +101,7 @@ void calculateOdom(void){
     
     
     
-    //static tf::TransformBroadcaster odom_broadcaster;
+    static tf::TransformBroadcaster odom_broadcaster;
     
     
     odometry.dx = (odometry.v*cos(odometry.rad.yaw)*sensor_data.dt.toSec());
@@ -115,7 +113,7 @@ void calculateOdom(void){
     tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
 
 
-    //tf::Transform transform;
+    //:tf::Transform transform;
     //transform.setOrigin( tf::Vector3(odometry.x, odometry.y, 0.0) );
     //tf::Quaternion q(0,0,0,1);
     //q.setEuler(0, 0, odom_quat);
@@ -124,18 +122,18 @@ void calculateOdom(void){
     
     
     
-    //geometry_msgs::TransformStamped odom_transform;
-    //odom_transform.header.stamp = sensor_data.time2;
-    //odom_transform.header.frame_id = "tfbroadcast";
-    //odom_transform.child_frame_id = "base_link";
+    geometry_msgs::TransformStamped odom_transform;
+    odom_transform.header.stamp = sensor_data.time2;
+    odom_transform.header.frame_id = "tfbroadcast";
+    odom_transform.child_frame_id = "base_link";
     
-    //odom_transform.transform.translation.x = odometry.x;
-    //odom_transform.transform.translation.y = odometry.y;
-    //odom_transform.transform.translation.z = odometry.z;
-    //odom_transform.transform.rotation = odom_quat;
+    odom_transform.transform.translation.x = odometry.x;
+    odom_transform.transform.translation.y = odometry.y;
+    odom_transform.transform.translation.z = odometry.z;
+    odom_transform.transform.rotation = odom_quat;
     
     
-    //odom_broadcaster.sendTransform(odom_transform);
+    odom_broadcaster.sendTransform(odom_transform);
     
     nav_msgs::Odometry odom;
     odom.header.stamp = sensor_data.time2;
