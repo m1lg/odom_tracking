@@ -75,11 +75,6 @@ void jointTransforms(const tf2_ros::Buffer &buffer){
     base_link.point.y = 0;
     base_link.point.z = 0;
     
-    odometry.x = 0;
-    odometry.y = 0;
-    
-
-    
     base_footprint.header.frame_id = "base_footprint";
     buffer.transform(base_link, base_footprint, "base_footprint");
     vehicle.wheel_r = base_footprint.point.z;              //base footprint is on the ground, the transform from baselink will give the wheel radius measurement
@@ -106,7 +101,7 @@ void calculateOdom(void){
     
     
     
-    tf2_ros::TransformBroadcaster odom_broadcaster;
+    static tf::TransformBroadcaster odom_broadcaster;
     
     
     odometry.dx = (odometry.v*sin(odometry.degrees.yaw)*sensor_data.dt.toSec());
@@ -142,9 +137,9 @@ void calculateOdom(void){
     odom.pose.pose.position.z = odometry.z;
     odom.pose.pose.orientation = odom_quat;
     
-    odom.twist.twist.linear.x = odometry.v*sin(odometry.degrees.yaw);
-    odom.twist.twist.linear.y = odometry.v*cos(odometry.degrees.yaw);
-    odom.twist.twist.angular.z = odometry.degrees.yaw;
+    //odom.twist.twist.linear.x = odometry.v*sin(odometry.degrees.yaw);
+    //odom.twist.twist.linear.y = odometry.v*cos(odometry.degrees.yaw);
+    //odom.twist.twist.angular.z = odometry.degrees.yaw;
     
     odom_pub.publish(odom);
     
