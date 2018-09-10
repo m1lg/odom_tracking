@@ -99,23 +99,12 @@ void jointTransforms(const tf2_ros::Buffer &buffer){
 
 void calculateOdom(void){
     
-    
-    
     static tf::TransformBroadcaster odom_broadcaster;
-    
     
     odometry.dx = (odometry.v*cos(odometry.rad.yaw)*sensor_data.dt.toSec());
     odometry.dy = (odometry.v*sin(odometry.rad.yaw)*sensor_data.dt.toSec());
-<<<<<<< HEAD
     odometry.x += odometry.dx;
     odometry.y += odometry.dy;
-    
-    geometry_msgs::Quaternion odom_quat;
-    tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
-   
-=======
-    odometry.x -= odometry.dx;
-    odometry.y -= odometry.dy;
     
     geometry_msgs::Quaternion odom_quat;
     tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
@@ -129,22 +118,14 @@ void calculateOdom(void){
     //odom_broadcaster.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_link", "testing"));
     
     
->>>>>>> 94d5af3296e3f1a65a26e630b4bc632d223bc917
-    
     geometry_msgs::TransformStamped odom_transform;
     odom_transform.header.stamp = sensor_data.time2;
     odom_transform.header.frame_id = "odom";
     odom_transform.child_frame_id = "base_link";
     
-<<<<<<< HEAD
     odom_transform.transform.translation.x = odometry.x;
     odom_transform.transform.translation.y = odometry.y;
     odom_transform.transform.translation.z = odometry.z;
-=======
-    odom_transform.transform.translation.x = 0;
-    odom_transform.transform.translation.y = 0;
-    odom_transform.transform.translation.z = 0;
->>>>>>> 94d5af3296e3f1a65a26e630b4bc632d223bc917
     odom_transform.transform.rotation = odom_quat;
     
     
@@ -155,7 +136,6 @@ void calculateOdom(void){
     odom.header.frame_id = "odom";
     odom.child_frame_id = "base_link";
     
-    
     odom.pose.pose.position.x = odometry.x;
     odom.pose.pose.position.y = odometry.y;
     odom.pose.pose.position.z = odometry.z;
@@ -165,8 +145,6 @@ void calculateOdom(void){
     odom.twist.twist.linear.y = sin(odometry.rad.yaw);
     
     odom_pub.publish(odom);
-    
-    
     
     ROS_INFO("x = %f\t y = %f\t", odometry.dx, odometry.dy);
 }
@@ -194,15 +172,7 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
         } else if (sensor_data.dt.toSec() < 0){     // When bag file loops, dt is < 0, 
             odometry.x = 0;
             odometry.y = 0;
-<<<<<<< HEAD
             odometry.z = 0;
-           
-=======
-            sensor_data.time1 = ros::Time(0,10000000);
-
-            //ROS_INFO("End of bag file reached");  // End program when end of bag file is reached
-            //exit(0);
->>>>>>> 94d5af3296e3f1a65a26e630b4bc632d223bc917
         }
         
 	} 
@@ -213,13 +183,6 @@ void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
 
     tf::quaternionMsgToTF(msg->orientation, odometry.odom_quat_tf);  
     tf::Matrix3x3(odometry.odom_quat_tf).getRPY(odometry.rad.roll, odometry.rad.pitch , odometry.rad.yaw);
-            
-    odometry.degree.roll = odometry.rad.roll*(180/M_PI);    //converting radians to degrees
-    odometry.degree.pitch = odometry.rad.pitch*(180/M_PI);
-    odometry.degree.yaw = odometry.rad.yaw*(180/M_PI);
-    
-
-    //ROS_INFO("yaw = %f", sensor_data.current.y);
 }
 
 //callback for handling the GPS data input

@@ -108,29 +108,27 @@ public:
     }
     
     void calculateOdom(void){
-                
+        
         static tf::TransformBroadcaster odom_broadcaster;
-        geometry_msgs::Quaternion odom_quat;
-        geometry_msgs::TransformStamped odom_transform;
-        nav_msgs::Odometry odom;
         
-        tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
-        
-        //update odom
         odometry.dx = (odometry.v*cos(odometry.rad.yaw)*sensor_data.dt.toSec());
         odometry.dy = (odometry.v*sin(odometry.rad.yaw)*sensor_data.dt.toSec());
         odometry.x += odometry.dx;
         odometry.y += odometry.dy;
         
-        //broadcast transform
+        geometry_msgs::Quaternion odom_quat;
+        tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
+
+
         tf::Transform transform;
         transform.setOrigin( tf::Vector3(odometry.x, odometry.y, 0.0) );
         tf::Quaternion q;
         q = tf::createQuaternionFromRPY(0,0,odometry.rad.yaw);
-
         transform.setRotation(q);
-        odom_broadcaster.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_link", "odom"));
+        odom_broadcaster.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "odom", "baselink"));
         
+        
+        //geometry_msgs::TransformStamped odom_transform;
         //odom_transform.header.stamp = sensor_data.time2;
         //odom_transform.header.frame_id = "odom";
         //odom_transform.child_frame_id = "base_link";
@@ -143,6 +141,7 @@ public:
         
         //odom_broadcaster.sendTransform(odom_transform);
         
+        nav_msgs::Odometry odom;
         odom.header.stamp = sensor_data.time2;
         odom.header.frame_id = "odom";
         odom.child_frame_id = "base_link";
@@ -157,7 +156,7 @@ public:
         
         odom_pub.publish(odom);
         
-        ROS_INFO("publishing");
+        ROS_INFO("x = %f\t y = %f\t", odometry.dx, odometry.dy);
     }
     
     
@@ -186,8 +185,7 @@ public:
                 odometry.x = 0;
                 odometry.y = 0;
                 odometry.z = 0;
-                //ROS_INFO("End of bag file reached");  // End program when end of bag file is reached
-                //exit(0);
+
             }
             
 	    } 
