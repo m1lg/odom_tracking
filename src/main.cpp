@@ -67,21 +67,19 @@ void jointTransforms(const tf2_ros::Buffer &buffer){
     geometry_msgs::PointStamped rear_left_wheel_link;
     geometry_msgs::PointStamped right_steering_link;
 
-
+    
     base_link.header.frame_id = "base_link";
-    base_link.header.stamp = ros::Time();
-    
-    
+    base_link.header.stamp = ros::Time(); 
     //just an arbitrary point in space
     base_link.point.x = 0;
     base_link.point.y = 0;
     base_link.point.z = 0;
     
+
     base_footprint.header.frame_id = "base_footprint";
     buffer.transform(base_link, base_footprint, "base_footprint");
-    vehicle.wheel_r = base_footprint.point.z;              //base footprint is on the ground, the transform from baselink will give the wheel radius measurement
+    vehicle.wheel_r = base_footprint.point.z; //base footprint is on the ground, the transform from baselink will give the wheel radius measurement
     
-
     rear_right_wheel_link.header.frame_id = "rear_right_wheel_link";
     buffer.transform(base_link, rear_right_wheel_link, "rear_right_wheel_link");
     vehicle.wheel_track = 2*rear_right_wheel_link.point.y;    //the transform from baselink to the rear right wheel link is half the measurement of the track of the car
@@ -108,21 +106,45 @@ void calculateOdom(void){
     
     odometry.dx = (odometry.v*cos(odometry.rad.yaw)*sensor_data.dt.toSec());
     odometry.dy = (odometry.v*sin(odometry.rad.yaw)*sensor_data.dt.toSec());
+<<<<<<< HEAD
     odometry.x += odometry.dx;
     odometry.y += odometry.dy;
     
     geometry_msgs::Quaternion odom_quat;
     tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
    
+=======
+    odometry.x -= odometry.dx;
+    odometry.y -= odometry.dy;
+    
+    geometry_msgs::Quaternion odom_quat;
+    tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
+
+
+    //:tf::Transform transform;
+    //transform.setOrigin( tf::Vector3(odometry.x, odometry.y, 0.0) );
+    //tf::Quaternion q(0,0,0,1);
+    //q.setEuler(0, 0, odom_quat);
+    //transform.setRotation(q);
+    //odom_broadcaster.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_link", "testing"));
+    
+    
+>>>>>>> 94d5af3296e3f1a65a26e630b4bc632d223bc917
     
     geometry_msgs::TransformStamped odom_transform;
     odom_transform.header.stamp = sensor_data.time2;
     odom_transform.header.frame_id = "odom";
     odom_transform.child_frame_id = "base_link";
     
+<<<<<<< HEAD
     odom_transform.transform.translation.x = odometry.x;
     odom_transform.transform.translation.y = odometry.y;
     odom_transform.transform.translation.z = odometry.z;
+=======
+    odom_transform.transform.translation.x = 0;
+    odom_transform.transform.translation.y = 0;
+    odom_transform.transform.translation.z = 0;
+>>>>>>> 94d5af3296e3f1a65a26e630b4bc632d223bc917
     odom_transform.transform.rotation = odom_quat;
     
     
@@ -172,8 +194,15 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
         } else if (sensor_data.dt.toSec() < 0){     // When bag file loops, dt is < 0, 
             odometry.x = 0;
             odometry.y = 0;
+<<<<<<< HEAD
             odometry.z = 0;
            
+=======
+            sensor_data.time1 = ros::Time(0,10000000);
+
+            //ROS_INFO("End of bag file reached");  // End program when end of bag file is reached
+            //exit(0);
+>>>>>>> 94d5af3296e3f1a65a26e630b4bc632d223bc917
         }
         
 	} 
@@ -182,13 +211,9 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
 //Callback for handling the IMU data input
 void counterCallbackIMU(const sensor_msgs::Imu::ConstPtr& msg) {
 
-    
-
     tf::quaternionMsgToTF(msg->orientation, odometry.odom_quat_tf);  
     tf::Matrix3x3(odometry.odom_quat_tf).getRPY(odometry.rad.roll, odometry.rad.pitch , odometry.rad.yaw);
-    
-
-        
+            
     odometry.degree.roll = odometry.rad.roll*(180/M_PI);    //converting radians to degrees
     odometry.degree.pitch = odometry.rad.pitch*(180/M_PI);
     odometry.degree.yaw = odometry.rad.yaw*(180/M_PI);
