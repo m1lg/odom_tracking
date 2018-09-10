@@ -124,12 +124,12 @@ void calculateOdom(void){
     
     geometry_msgs::TransformStamped odom_transform;
     odom_transform.header.stamp = sensor_data.time2;
-    odom_transform.header.frame_id = "tfbroadcast";
+    odom_transform.header.frame_id = "odom";
     odom_transform.child_frame_id = "base_link";
     
-    odom_transform.transform.translation.x = odometry.x;
-    odom_transform.transform.translation.y = odometry.y;
-    odom_transform.transform.translation.z = odometry.z;
+    odom_transform.transform.translation.x = 0;
+    odom_transform.transform.translation.y = 0;
+    odom_transform.transform.translation.z = 0;
     odom_transform.transform.rotation = odom_quat;
     
     

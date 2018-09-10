@@ -152,7 +152,7 @@ include_directories(
 #   ${catkin_LIBRARIES}
 #)
 
-add_executable(egg src/main.cpp)
+add_executable(egg src/odom_main.cpp)
 add_dependencies(egg ${egg_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(egg ${catkin_LIBRARIES})
 
