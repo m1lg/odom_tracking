@@ -103,39 +103,30 @@ void calculateOdom(void){
     
     
     
-    //static tf::TransformBroadcaster odom_broadcaster;
+    static tf::TransformBroadcaster odom_broadcaster;
     
     
-    odometry.dx = (odometry.v*sin(odometry.rad.yaw)*sensor_data.dt.toSec());
-    odometry.dy = (odometry.v*cos(odometry.rad.yaw)*sensor_data.dt.toSec());
+    odometry.dx = (odometry.v*cos(odometry.rad.yaw)*sensor_data.dt.toSec());
+    odometry.dy = (odometry.v*sin(odometry.rad.yaw)*sensor_data.dt.toSec());
     odometry.x += odometry.dx;
     odometry.y += odometry.dy;
     
     geometry_msgs::Quaternion odom_quat;
     tf::quaternionTFToMsg(odometry.odom_quat_tf, odom_quat);
-
-
-    //tf::Transform transform;
-    //transform.setOrigin( tf::Vector3(odometry.x, odometry.y, 0.0) );
-    //tf::Quaternion q(0,0,0,1);
-    //q.setEuler(0, 0, odom_quat);
-    //transform.setRotation(q);
-    //odom_broadcaster.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "base_link", "testing"));
+   
+    
+    geometry_msgs::TransformStamped odom_transform;
+    odom_transform.header.stamp = sensor_data.time2;
+    odom_transform.header.frame_id = "odom";
+    odom_transform.child_frame_id = "base_link";
+    
+    odom_transform.transform.translation.x = odometry.x;
+    odom_transform.transform.translation.y = odometry.y;
+    odom_transform.transform.translation.z = odometry.z;
+    odom_transform.transform.rotation = odom_quat;
     
     
-    
-    //geometry_msgs::TransformStamped odom_transform;
-    //odom_transform.header.stamp = sensor_data.time2;
-    //odom_transform.header.frame_id = "tfbroadcast";
-    //odom_transform.child_frame_id = "base_link";
-    
-    //odom_transform.transform.translation.x = odometry.x;
-    //odom_transform.transform.translation.y = odometry.y;
-    //odom_transform.transform.translation.z = odometry.z;
-    //odom_transform.transform.rotation = odom_quat;
-    
-    
-    //odom_broadcaster.sendTransform(odom_transform);
+    odom_broadcaster.sendTransform(odom_transform);
     
     nav_msgs::Odometry odom;
     odom.header.stamp = sensor_data.time2;
@@ -148,8 +139,8 @@ void calculateOdom(void){
     odom.pose.pose.position.z = odometry.z;
     odom.pose.pose.orientation = odom_quat;
     
-    odom.twist.twist.linear.x = sin(odometry.rad.yaw);
-    odom.twist.twist.linear.y = cos(odometry.rad.yaw);
+    odom.twist.twist.linear.x = cos(odometry.rad.yaw);
+    odom.twist.twist.linear.y = sin(odometry.rad.yaw);
     
     odom_pub.publish(odom);
     
@@ -168,6 +159,7 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
         sensor_data.back_wheel_v1 = sensor_data.back_wheel_v2;
         sensor_data.back_wheel_v2 = angular_v*vehicle.wheel_r;  //linear velocity = angular velocity * wheel radius
         odometry.v =  (sensor_data.back_wheel_v1 + sensor_data.back_wheel_v2)/2;
+        ROS_INFO("v = %f", odometry.v);
         sensor_data.time1 = sensor_data.time2;                 //previous time stored
         sensor_data.time2 = msg->header.stamp;                 //save current time from sensor header time stamp
         sensor_data.dt = sensor_data.time2 - sensor_data.time1;  //dt is the difference between current time and previous time 
@@ -178,8 +170,10 @@ void counterCallbackJoint(const sensor_msgs::JointState::ConstPtr& msg) {// Defi
             calculateOdom();
             
         } else if (sensor_data.dt.toSec() < 0){     // When bag file loops, dt is < 0, 
-            ROS_INFO("End of bag file reached");  // End program when end of bag file is reached
-            exit(0);
+            odometry.x = 0;
+            odometry.y = 0;
+            odometry.z = 0;
+           
         }
         
 	} 
@@ -218,6 +212,10 @@ int main(int argc, char** argv) {
 
     tf2_ros::Buffer tf2Buffer;              //create a buffer for handling transform data
     tf2_ros::TransformListener tf2Listener(tf2Buffer);  //listen for the transform data 
+    
+    odometry.x = 0;
+    odometry.y = 0;
+    odometry.z = 0;
     
     while(!tf2Received) {                     //wait until transform data has started transmitting to proceed
     
